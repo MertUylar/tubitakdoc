@@ -1,0 +1,51 @@
+#include <QCoreApplication>
+#include <raspicam/raspicam.h>
+#include <QTimer>
+#include <QImage>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QPixmap>
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication a(argc, argv);
+
+    // Raspberry Pi kamerayı açın
+    raspicam::RaspiCam camera;
+    camera.setWidth(640);
+    camera.setHeight(480);
+    camera.setFrameRate(30);
+    if (!camera.open()) {
+        std::cerr << "Kamera açılırken hata oluştu" << std::endl;
+        return -1;
+    }
+
+    // Qt uygulama arayüzünü oluşturun
+    QLabel label;
+    QVBoxLayout layout;
+    layout.addWidget(&label);
+    QWidget window;
+    window.setLayout(&layout);
+    window.show();
+
+    // Kamera verilerini almak için QTimer kullanın
+    QTimer timer;
+    QObject::connect(&timer, &QTimer::timeout, [&]() {
+        // Görüntü için bellek ayırın
+        unsigned char* image = new unsigned char[camera.getImageTypeSize(raspicam::RASPICAM_FORMAT_RGB)];
+
+        // Görüntüyü yakalayın
+        camera.grab();
+        camera.retrieve(image, raspicam::RASPICAM_FORMAT_RGB);
+
+        // QImage oluşturun ve QLabel'e gösterin
+        QImage qimage(image, camera.getWidth(), camera.getHeight(), QImage::Format_RGB888);
+        label.setPixmap(QPixmap::fromImage(qimage));
+
+        // Belleği serbest bırakın
+        delete[] image;
+    });
+    timer.start(33); // 30 FPS için 33 ms'lik zamanlayıcı
+
+    return a.exec();
+}
